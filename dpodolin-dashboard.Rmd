@@ -1,0 +1,90 @@
+---
+title: "dpodolin-dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(stringr)
+
+source("~/shared/minor2_2023/1-Intro/hw1/hw1_data.R")
+
+airline = hw1_get_data(df_name = "airline")
+airport = hw1_get_data(df_name = "airport")
+lounge = hw1_get_data(df_name = "lounge")
+seat = hw1_get_data(df_name = "seat")
+
+seat$date = ymd(seat$date)
+seat$date_flown = dmy(seat$date_flown)
+seat[23, 9] = "3x3"
+seat[92, 9] = "3x3"
+# загрузка данных, предобработка 
+```
+
+Column {data-width=550}
+-----------------------------------------------------------------------
+
+### Аэропорты, с оценкой чистоты меньше, чем в соответсвующих лаунж зонах 
+
+```{r}
+loun = lounge %>% select(title = airport, cleanliness_rating,lounge_name)
+loun$lounge_name = str_remove_all(loun$lounge_name, " LOUNGE REVIEW")
+loun$lounge_name = str_remove_all(loun$lounge_name, " CUSTOMER REVIEW")
+
+airp = airport %>% select(title, terminal_cleanliness_rating) 
+airp$title = str_remove_all(airp$title, " customer review")
+airp$title = str_remove_all(airp$title, " CUSTOMER REVIEW")
+
+
+vmeste = inner_join(loun, airp)  %>% filter(!is.na(terminal_cleanliness_rating))%>% filter(!is.na(cleanliness_rating))  %>% group_by(lounge_name) %>% summarise(mean_terminal_cleanliness_rating=mean(terminal_cleanliness_rating), mean_lounge_cleanliness_rating = mean(cleanliness_rating)) %>% filter(mean_lounge_cleanliness_rating>mean_terminal_cleanliness_rating)
+
+otv = left_join(vmeste, select(loun, title, lounge_name)) %>% distinct(.keep_all = TRUE ) %>% mutate(raznitsa =mean_lounge_cleanliness_rating - mean_terminal_cleanliness_rating ) 
+otv$full = paste(otv$title, otv$lounge_name, sep=" \n")
+
+
+
+
+q = top_n(otv,5,otv$raznitsa) %>% arrange(-raznitsa) #смотрим полезную информацию - топ 5 аэропортов с большей разницей двух оценок, из otv - переменная q
+
+
+ggplot()+
+  geom_bar(data = q, aes(x = full, width = 0.8, y =mean_lounge_cleanliness_rating), stat = "identity", col = "#403a3a", fill = "pink") + 
+  geom_bar(data = q, aes(x = full,width = 0.6, y = mean_terminal_cleanliness_rating), stat = "identity", col = "grey", fill = "#9224A6", alpha = 0.5)+ 
+  theme(axis.text.y = element_text(angle = 30,size = 6))+
+  xlab("Назавние аэропорта и лаунж зоны") +
+  ylab("Оценка чистоты аэропорта(пурпурный) \n Оценка чистоы лаунж зоны(розовый)") +
+  ggtitle("Топ 5 аэропортов с наибольшей \n разницей чистоты,\n удовлетворяющих условию")+
+  coord_flip()
+```
+
+Column {data-width=450}
+-----------------------------------------------------------------------
+
+### Такое количество проходов в самолете предпочитают пассажиры
+
+```{r}
+valueBox("2")
+```
+
+### Частота выбора оценок ширины кресла в зависимости от времени года(лето)
+
+```{r}
+seat_with_summ = seat %>% mutate(summ = (month(date_flown) %in% c(6,7,8)))
+ggplot() +
+  geom_boxplot(data = seat_with_summ, aes(x = factor(summ), y = seat_width_rating), col = "#E52B50", fill = "#F0F8FF") +
+  xlab("Перелет в летний месяц?") +
+  ylab("Оценка ширины кресла") +
+  ggtitle("Распределение оценок ширины кресла в зависимости\n от времени года") 
+```
+
+### В таком количестве аэропортов общая оценка чистоты меньше оценки чистоты в соответсвующей лаунж зоне
+
+```{r}
+valueBox("217")
+```
