@@ -97,7 +97,7 @@
 
 ---
 
-## <a name="english"></a> 🇬🇧 English
+## <a name="english"></a>
 
 # Exploratory Data Analysis of Airlines and Airports
 
